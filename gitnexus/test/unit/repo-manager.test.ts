@@ -45,6 +45,32 @@ describe('getStoragePath', () => {
     // Should be an absolute path
     expect(path.isAbsolute(result)).toBe(true);
   });
+
+  describe('with GITNEXUS_STORAGE_DIR', () => {
+    const ORIG = process.env.GITNEXUS_STORAGE_DIR;
+    beforeEach(() => { process.env.GITNEXUS_STORAGE_DIR = '/data/gitnexus/indexes'; });
+    afterEach(() => {
+      if (ORIG === undefined) delete process.env.GITNEXUS_STORAGE_DIR;
+      else process.env.GITNEXUS_STORAGE_DIR = ORIG;
+    });
+
+    it('redirects storage under GITNEXUS_STORAGE_DIR with basename-hash subdir', () => {
+      const result = getStoragePath('/workspace/lumi/AppRentSkillsWeb');
+      expect(result).toMatch(/^\/data\/gitnexus\/indexes\/AppRentSkillsWeb-[a-f0-9]{8}\/\.gitnexus$/);
+    });
+
+    it('produces stable paths for the same repoPath', () => {
+      const a = getStoragePath('/workspace/lumi/AppRentSkillsWeb');
+      const b = getStoragePath('/workspace/lumi/AppRentSkillsWeb');
+      expect(a).toBe(b);
+    });
+
+    it('produces different paths for different repo paths', () => {
+      const a = getStoragePath('/workspace/repo-one');
+      const b = getStoragePath('/workspace/repo-two');
+      expect(a).not.toBe(b);
+    });
+  });
 });
 
 // ─── getStoragePaths ─────────────────────────────────────────────────

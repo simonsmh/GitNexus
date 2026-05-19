@@ -36,6 +36,7 @@ import { JobManager } from './analyze-job.js';
 import { assertString, escapeRegExp, BadRequestError, createRouteLimiter } from './validation.js';
 import { extractRepoName, getCloneDir, cloneOrPull } from './git-clone.js';
 import { logger, flushLoggerSync } from '../core/logger.js';
+import { startWorkspaceScanner } from './workspace-scanner.js';
 
 const _require = createRequire(import.meta.url);
 const pkg = _require('../../package.json');
@@ -188,6 +189,7 @@ a.ext:hover{text-decoration:underline}
   <p class="endpoint"><code>/api/heartbeat</code> <span style="color:#5a5a70">— SSE heartbeat</span></p>
   <p class="endpoint"><code>/api/graph</code> <code>/api/query</code> <code>/api/search</code> <span style="color:#5a5a70">— Data</span></p>
   <p class="endpoint"><code>/api/mcp</code> <span style="color:#5a5a70">— MCP over StreamableHTTP</span></p>
+  <p class="endpoint"><code>/api/mcp/sse</code> <code>/api/mcp/message</code> <span style="color:#5a5a70">— MCP over SSE</span></p>
   <div class="divider"></div>
   <div class="section-title">Web UI not found</div>
   <div class="terminal"><span class="prompt">$ </span><span class="cmd">cd gitnexus-web &amp;&amp; npm run build</span></div>
@@ -725,6 +727,7 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
   // Initialize MCP backend (multi-repo, shared across all MCP sessions)
   const backend = new LocalBackend();
   await backend.init();
+  const cleanupScanner = startWorkspaceScanner();
   const cleanupMcp = mountMCPEndpoints(app, backend);
   const jobManager = new JobManager();
 

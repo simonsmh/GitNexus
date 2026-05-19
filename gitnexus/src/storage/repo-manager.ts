@@ -10,6 +10,7 @@ import fs from 'fs/promises';
 import { realpathSync } from 'fs';
 import path from 'path';
 import os from 'os';
+import { createHash } from 'crypto';
 import { getInferredRepoName, resolveRepoIdentityRoot } from './git.js';
 import { logger } from '../core/logger.js';
 
@@ -135,8 +136,24 @@ const GITNEXUS_EXCLUDE_ENTRY = `${GITNEXUS_DIR}/`;
 
 /**
  * Get the .gitnexus storage path for a repository
+ *
+ * When the `GITNEXUS_STORAGE_DIR` environment variable is set, the index
+ * is stored under that directory instead of inside the repo itself. This
+ * supports analyzing read-only mounts (e.g. Docker `:ro` workspaces) by
+ * redirecting index data to a writable volume.
+ *
+ * The subdirectory is derived from the repo path:
+ * `<basename>-<sha256-prefix>/.gitnexus`
+ * Example: `AppRentSkillsWeb-a1b2c3d4/.gitnexus`
  */
 export const getStoragePath = (repoPath: string): string => {
+  const storageBase = process.env.GITNEXUS_STORAGE_DIR;
+  if (storageBase) {
+    const resolved = path.resolve(repoPath);
+    const dirName = path.basename(resolved);
+    const hash = createHash('sha256').update(resolved).digest('hex').slice(0, 8);
+    return path.join(storageBase, `${dirName}-${hash}`, GITNEXUS_DIR);
+  }
   return path.join(path.resolve(repoPath), GITNEXUS_DIR);
 };
 

@@ -4,7 +4,7 @@
  * Tests: getStoragePath, getStoragePaths, readRegistry, registerRepo, unregisterRepo
  * Covers hardening fixes #29 (API key file permissions) and #30 (case-insensitive paths on Windows)
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import path from 'path';
 import os from 'os';
 import fs from 'fs/promises';
@@ -46,29 +46,30 @@ describe('getStoragePath', () => {
     expect(path.isAbsolute(result)).toBe(true);
   });
 
-  describe('with GITNEXUS_STORAGE_DIR', () => {
-    const ORIG = process.env.GITNEXUS_STORAGE_DIR;
-    beforeEach(() => { process.env.GITNEXUS_STORAGE_DIR = '/data/gitnexus/indexes'; });
-    afterEach(() => {
-      if (ORIG === undefined) delete process.env.GITNEXUS_STORAGE_DIR;
-      else process.env.GITNEXUS_STORAGE_DIR = ORIG;
+  describe('fallback on read-only filesystem', () => {
+    const ORIG_HOME = process.env.GITNEXUS_HOME;
+    beforeAll(() => { process.env.GITNEXUS_HOME = '/data/gitnexus'; });
+    afterAll(() => {
+      if (ORIG_HOME === undefined) delete process.env.GITNEXUS_HOME;
+      else process.env.GITNEXUS_HOME = ORIG_HOME;
     });
 
-    it('redirects storage under GITNEXUS_STORAGE_DIR with basename-hash subdir', () => {
-      const result = getStoragePath('/workspace/lumi/AppRentSkillsWeb');
-      expect(result).toMatch(/^\/data\/gitnexus\/indexes\/AppRentSkillsWeb-[a-f0-9]{8}\/\.gitnexus$/);
+    it('falls back to GITNEXUS_HOME/indexes when repo root is read-only', () => {
+      // Use a path that exists but is not writable
+      const result = getStoragePath('/usr/share');
+      expect(result).toMatch(/^\/data\/gitnexus\/indexes\/share-[a-f0-9]{8}\/\.gitnexus$/);
     });
 
     it('produces stable paths for the same repoPath', () => {
-      const a = getStoragePath('/workspace/lumi/AppRentSkillsWeb');
-      const b = getStoragePath('/workspace/lumi/AppRentSkillsWeb');
+      const a = getStoragePath('/usr/share');
+      const b = getStoragePath('/usr/share');
       expect(a).toBe(b);
     });
 
-    it('produces different paths for different repo paths', () => {
-      const a = getStoragePath('/workspace/repo-one');
-      const b = getStoragePath('/workspace/repo-two');
-      expect(a).not.toBe(b);
+    it('uses default ~/.gitnexus/indexes when GITNEXUS_HOME is unset', () => {
+      delete process.env.GITNEXUS_HOME;
+      const result = getStoragePath('/usr/share');
+      expect(result).toMatch(/^\/home\/[^/]+\/\.gitnexus\/indexes\/share-[a-f0-9]{8}\/\.gitnexus$/);
     });
   });
 });

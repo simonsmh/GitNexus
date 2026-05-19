@@ -7,7 +7,7 @@
  */
 
 import fs from 'fs/promises';
-import { realpathSync } from 'fs';
+import { realpathSync, accessSync, constants } from 'fs';
 import path from 'path';
 import os from 'os';
 import { createHash } from 'crypto';
@@ -135,26 +135,26 @@ const GITNEXUS_EXCLUDE_ENTRY = `${GITNEXUS_DIR}/`;
 // ─── Local Storage Helpers ─────────────────────────────────────────────
 
 /**
- * Get the .gitnexus storage path for a repository
+ * Get the .gitnexus storage path for a repository.
  *
- * When the `GITNEXUS_STORAGE_DIR` environment variable is set, the index
- * is stored under that directory instead of inside the repo itself. This
- * supports analyzing read-only mounts (e.g. Docker `:ro` workspaces) by
- * redirecting index data to a writable volume.
- *
- * The subdirectory is derived from the repo path:
- * `<basename>-<sha256-prefix>/.gitnexus`
- * Example: `AppRentSkillsWeb-a1b2c3d4/.gitnexus`
+ * When the repo root is not writable (e.g. Docker `:ro` mount), falls back
+ * to `$GITNEXUS_HOME/indexes/<basename>-<sha256-prefix>/.gitnexus` so index
+ * data can be written to a persistent volume.
  */
 export const getStoragePath = (repoPath: string): string => {
-  const storageBase = process.env.GITNEXUS_STORAGE_DIR;
-  if (storageBase) {
-    const resolved = path.resolve(repoPath);
-    const dirName = path.basename(resolved);
-    const hash = createHash('sha256').update(resolved).digest('hex').slice(0, 8);
-    return path.join(storageBase, `${dirName}-${hash}`, GITNEXUS_DIR);
+  const resolved = path.resolve(repoPath);
+  try {
+    accessSync(resolved, constants.W_OK);
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === 'EROFS' || code === 'EACCES' || code === 'EPERM') {
+      const dirName = path.basename(resolved);
+      const hash = createHash('sha256').update(resolved).digest('hex').slice(0, 8);
+      const globalDir = process.env.GITNEXUS_HOME || path.join(os.homedir(), '.gitnexus');
+      return path.join(globalDir, 'indexes', `${dirName}-${hash}`, GITNEXUS_DIR);
+    }
   }
-  return path.join(path.resolve(repoPath), GITNEXUS_DIR);
+  return path.join(resolved, GITNEXUS_DIR);
 };
 
 /**

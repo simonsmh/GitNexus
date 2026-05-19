@@ -18,10 +18,6 @@ services:
       # Override with `WORKSPACE_DIR=/abs/path/to/your/repos`.
       - ${WORKSPACE_DIR:-./workspace}:/workspace:ro
     environment:
-      # Redirect per-repo indexes (.gitnexus/) to the persistent volume.
-      # This keeps the workspace mount read-only while allowing analyze
-      # to write index data. See GITNEXUS_SCAN_INTERVAL below.
-      - GITNEXUS_STORAGE_DIR=/data/gitnexus/indexes
       # Periodic workspace scanner: scans /workspace for git repos and
       # analyzes any that need updating. Omitting this disables scanning.
       - GITNEXUS_SCAN_INTERVAL=${GITNEXUS_SCAN_INTERVAL:-}
